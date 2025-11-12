@@ -1,0 +1,35 @@
+# General
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.db
+*.DS_Store
+
+# Environments
+.venv/
+env/
+venv/
+*.env
+.env
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# Node/Vue frontend
+node_modules/
+dist/
+*.log
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Misc
+*.pdf
