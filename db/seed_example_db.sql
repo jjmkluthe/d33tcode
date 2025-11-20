@@ -1,10 +1,6 @@
 -- ChatGPT was used to help generate example data
 -- I refactored this to match my own vision for the project
 
--- db/seed.sql
--- Seed data for the d33tcode project
--- Run after tables exist:  psql -d d33tcode -f db/seed.sql
-
 BEGIN;
 
 -- Clear existing data and reset sequences
