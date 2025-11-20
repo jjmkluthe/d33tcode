@@ -2,7 +2,7 @@
 CREATE TABLE app_user (
   id SERIAL PRIMARY KEY,
   username VARCHAR(80) UNIQUE NOT NULL,
-  password VARCHAR(80) NOT NULL,
+  password TEXT NOT NULL,
   email_address VARCHAR(255) UNIQUE NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('admin','standard')) DEFAULT 'standard',
   update_password BOOLEAN

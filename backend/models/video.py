@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, CheckConstraint
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy import Column, Integer, String, Text, Boolean, CheckConstraint, ForeignKey
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from .base import Base
 
 class Video(Base):
     __tablename__ = "video"

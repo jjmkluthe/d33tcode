@@ -25,11 +25,11 @@ class Settings(BaseSettings):
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_EXPIRES_MIN: int = 60
 
-    config = SettingsConfigDict(
+    model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="APP_",
         case_sensitive=False,
-        extra="ignore",
+        extra="ignore"
     )
 
 

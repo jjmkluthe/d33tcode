@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from .base import Base
 
 class Solution(Base):
     __tablename__ = "solution"

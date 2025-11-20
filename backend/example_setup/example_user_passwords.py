@@ -17,8 +17,7 @@ from sqlalchemy import select
 
 from config.session import AsyncSessionLocal
 from auth.security import hash_password
-from backend.models.app_user import AppUser
-
+from models.app_user import AppUser
 
 async def main():
     async with AsyncSessionLocal() as session:

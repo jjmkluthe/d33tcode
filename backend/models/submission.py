@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, Numeric
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from .base import Base
 
 class Submission(Base):
     __tablename__ = "submission"

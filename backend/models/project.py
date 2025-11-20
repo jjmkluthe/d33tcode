@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, CheckConstraint
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from .base import Base
 
 class Project(Base):
     __tablename__ = "project"
@@ -16,7 +16,7 @@ class Project(Base):
     problem = relationship("Problem", back_populates="projects")
     solution = relationship("Solution", back_populates="projects")
     videos = relationship("Video", back_populates="project")
-    
+
     submissions = relationship(
         "Submission",
         back_populates="project",

@@ -11,7 +11,7 @@ db-seed:
 	psql -d $(DB_NAME) -f $(DB_DIR)/seed_example_db.sql
 
 db-fix-passwords:
-	cd $(BACKEND_DIR) && uv run python fix_passwords.py
+	cd $(BACKEND_DIR) && uv run python -m example_setup.example_user_passwords
 
 db-reset: db-drop db-create db-seed db-fix-passwords
 
