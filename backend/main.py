@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Header, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from pydantic import BaseModel
 
@@ -14,6 +15,10 @@ from auth.security import hash_password, verify_password, create_access_token, d
 from models import AppUser, Project, Problem, Solution, Video, Submission
 
 settings = get_settings()
+
+API_PREFIX = settings.API_PREFIX
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{API_PREFIX}/login")
+
 app = FastAPI(title="D33tcode", debug=settings.DEBUG)
 
 app.add_middleware(
@@ -23,8 +28,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-API_PREFIX = settings.API_PREFIX
 
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
@@ -130,13 +133,10 @@ class ProjectsByDifficulty(BaseModel):
 # auth
 
 async def get_current_user(
-    authorization: str = Header(..., description="Bearer <token>"),
+    token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> AppUser:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid auth header")
 
-    token = authorization.split(" ", 1)[1].strip()
     try:
         payload = decode_access_token(token)
     except Exception:
@@ -161,24 +161,169 @@ async def require_admin(user: AppUser = Depends(get_current_user)) -> AppUser:
 # login endpoint
 
 @app.post(f"{API_PREFIX}/login", response_model=TokenResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(AppUser).where(AppUser.username == data.username))
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    username = form_data.username
+    password = form_data.password
+
+    result = await db.execute(select(AppUser).where(AppUser.username == username))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(data.password, user.password):
-        raise HTTPException(status_code=401, detail="Bad username or password")
+    if not user or not verify_password(password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
 
     return TokenResponse(
         access_token=token,
+        token_type="bearer",
         user_id=user.id,
         username=user.username,
         role=user.role,
     )
 
+# get user endpoint
+
+@app.get(f"{API_PREFIX}/users/me", response_model=UserRead)
+async def get_me(current_user: AppUser = Depends(get_current_user)):
+    return current_user
 
 
-@app.get("/")
-def read_root():
-    return {"Hey this is the thing!"}
+# admin user actions: list all and create user
+
+@app.get(f"{API_PREFIX}/users", response_model=List[UserRead])
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_admin),
+):
+    result = await db.execute(select(AppUser))
+    return result.scalars().all()
+
+
+@app.post(f"{API_PREFIX}/users", response_model=UserRead)
+async def create_user(
+    data: UserCreate,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_admin),
+):
+    user = AppUser(
+        username=data.username,
+        email_address=data.email_address,
+        password=hash_password(data.password),
+        role=data.role,
+        update_password=False,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+# CRUD for PROJECT table. This is our basic crud for the frontend
+
+@app.get(f"{API_PREFIX}/projects", response_model=List[ProjectOut])
+async def list_projects(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(select(Project))
+    return result.scalars().all()
+
+
+@app.get(f"{API_PREFIX}/projects/{{project_id}}", response_model=ProjectOut)
+async def get_project(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    proj = result.scalar_one_or_none()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return proj
+
+
+@app.post(f"{API_PREFIX}/projects", response_model=ProjectOut)
+async def create_project(
+    data: ProjectIn,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_admin),
+):
+    proj = Project(**data.model_dump())
+    db.add(proj)
+    await db.commit()
+    await db.refresh(proj)
+    return proj
+
+
+@app.put(f"{API_PREFIX}/projects/{{project_id}}", response_model=ProjectOut)
+async def update_project(
+    project_id: int,
+    data: ProjectIn,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_admin),
+):
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    proj = result.scalar_one_or_none()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(proj, k, v)
+
+    await db.commit()
+    await db.refresh(proj)
+    return proj
+
+
+@app.delete(f"{API_PREFIX}/projects/{{project_id}}", status_code=204)
+async def delete_project(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_admin),
+):
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    proj = result.scalar_one_or_none()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    await db.delete(proj)
+    await db.commit()
+    return
+
+# the rest of these tables are read only for this example app
+
+@app.get(f"{API_PREFIX}/problems", response_model=List[ProblemOut])
+async def list_problems(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(select(Problem))
+    return result.scalars().all()
+
+
+@app.get(f"{API_PREFIX}/solutions", response_model=List[SolutionOut])
+async def list_solutions(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(select(Solution))
+    return result.scalars().all()
+
+
+@app.get(f"{API_PREFIX}/videos", response_model=List[VideoOut])
+async def list_videos(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(select(Video))
+    return result.scalars().all()
+
+
+@app.get(f"{API_PREFIX}/submissions", response_model=List[SubmissionOut])
+async def list_submissions(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(select(Submission))
+    return result.scalars().all()
 
